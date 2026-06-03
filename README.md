@@ -95,6 +95,7 @@ is a single-purpose module it calls.
 
 | File | Role |
 |---|---|
+| `peak.py` | Interactive menu (arrow-key TUI) — the default entry point; wraps every script below. |
 | `run_benchmark.py` | Orchestrator / CLI. Loads, pairs, loops, aggregates, writes the report. |
 | `corpus.py` | Loads + validates `golden_cases.csv` and the agent input CSV; pairs them by `id`. |
 | `categories.py` | The 12 case categories and their trust-risk classification (what's "trust-critical" vs "calibration"). |
@@ -161,7 +162,31 @@ cp .env.example .env
 #   edit .env: set ANTHROPIC_API_KEY and BQ_PROJECT
 ```
 
-## Run a benchmark
+## Run it — the menu
+
+The normal way to drive everything is the interactive menu:
+
+```bash
+.venv/bin/python peak.py
+```
+
+It's an arrow-key TUI that wraps every task, so you don't have to remember
+flags or paths:
+
+- **Run a benchmark** — pick an agent CSV from `inputs/`, name the run, choose
+  whether to include drafts. Warns (with the prior report) if you're about to
+  re-run an identical agent/corpus/judge combination.
+- **Validate the judge** / **Check calibration freshness**
+- **View latest report** — opens a past run from `runs/benchmark/`
+- **Regenerate agent input template**, **Generate Sheets .xlsx / reference CSVs**
+
+The menu expects your reviewed corpus at `corpus/golden_cases.csv` (copy it from
+the template — see [The corpus](#the-corpus-ground-truth) below) and agent
+submissions in `inputs/`.
+
+### Scriptable alternative (CI, automation)
+
+Every menu action maps to a script you can call directly — useful for CI:
 
 ```bash
 .venv/bin/python run_benchmark.py corpus/golden_cases.csv inputs/<agent>.csv \
@@ -171,6 +196,25 @@ cp .env.example .env
 Prints the scorecard and writes a full report to `runs/benchmark/<agent>_<timestamp>.md`.
 (Add `--include-drafts` to score `status: draft` cases too; add `--force` to re-run
 an identical, already-benchmarked combination.)
+
+## The run report — per-case reasoning
+
+Every run writes a markdown report to `runs/benchmark/<agent>_<timestamp>.md`. Above
+the headline scorecard it carries a **per-case breakdown** so you can see *why* each
+case scored the way it did — not just a pass/fail tally. For each case it records:
+
+- the **prompt**, tier, and category
+- **execution_match**, and when results differ, the exec-diff (which columns, rows,
+  or values diverged)
+- the judge's three dimension scores (factual / complete / no_halluc) and the
+  **failure category** (`wrong_join`, `time_window`, …)
+- **Judge reasoning** — the judge's own free-text account of *what it looked at and
+  why it scored that way*, citing the specific SQL operations and explanation phrases
+- the optimization verdict plus per-query bytes-scanned and timing
+
+This is the artifact to open when a score surprises you, or to hand an agent owner as
+actionable feedback. (Reports can contain real query results, so `runs/` is gitignored
+by default — see [the honesty note](#a-note-on-honesty).)
 
 ---
 
@@ -240,6 +284,16 @@ Cohen's κ to discount chance agreement). Each dimension should agree ≥ 85%.
 The judge prompt is hashed, so a calibration is tied to the exact prompt version it
 was measured against; editing `JUDGE_PROMPT` flags the old calibration as stale (and
 you should re-run `validate_judge.py`).
+
+---
+
+## Roadmap
+
+The harness is a deliberately thin shell — a correct scoring core plus a seed corpus —
+meant to be extended as real agent failures surface. Planned work (deeper deterministic
+signals, multi-judge agreement with Cohen's κ as the real gate, agent confidence
+calibration, versioned/reproducible runs, CI mode, and more) lives in
+[`ROADMAP.md`](./ROADMAP.md).
 
 ---
 
