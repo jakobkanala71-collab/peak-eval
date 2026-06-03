@@ -1,0 +1,15 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+
+# Runtime corpus you author locally (copy from corpus/golden_cases_template.csv).
+corpus/golden_cases.csv
+
+# Agent submissions under test.
+inputs/*.csv
+!inputs/.gitkeep
+
+# Benchmark + calibration reports — may embed real query results.
+runs/

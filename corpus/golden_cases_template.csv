@@ -1,0 +1,55 @@
+id,tier,category,domain,prompt,peak_sql,golden_reasoning,tables,sql_features,ambiguity_flag,evidence_required,status
+t1_total_members,T1,translation_correctness,membership,How many total members do we have?,SELECT COUNT(*) AS total_members FROM `demo.dim.members`;,"Single-table count of all member rows. Floor-check case — if this fails, something is wrong with the agent or the harness.",demo.dim.members,count,N,N,draft
+t1_avg_ride_duration_2026,T1,translation_correctness,operations,What is the average ride duration for rides taken in 2026?,"SELECT AVG(duration_min) AS avg_duration_min
+FROM `demo.trips.rides`
+WHERE EXTRACT(YEAR FROM ride_date) = 2026;",Single aggregate with a date filter. Tests basic filter + aggregate translation.,demo.trips.rides,"avg, date_filter",N,N,draft
+t1_rides_per_station_last_quarter,T1,translation_correctness,operations,How many rides started at each station last quarter?,"SELECT station_id, COUNT(*) AS rides
+FROM `demo.trips.rides`
+WHERE ride_date >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 1 QUARTER), QUARTER)
+  AND ride_date <  DATE_TRUNC(CURRENT_DATE(), QUARTER)
+GROUP BY station_id;","Group-by with a date range. Tests that the agent picks consistent boundaries for 'last quarter' (full quarter, not trailing 90).",demo.trips.rides,"group_by, date_range, count",N,N,draft
+t2_active_members_v2_vs_legacy,T2,schema_selection,membership,How many active members do we have?,"SELECT COUNT(*) AS active_members
+FROM `demo.dim.members`
+WHERE status = 'active';","The warehouse has both `dim.members` (current) and `dim.members_archive`. Trust-critical: agent must pick the current table. Failure is silent — wrong table, plausible-looking number.",demo.dim.members,"count, filter",N,N,draft
+t2_cancellation_rate_q1,T2,business_logic,operations,What was our overall ride cancellation rate in Q1 2026?,"SELECT
+  COUNTIF(status = 'cancelled') / COUNT(*) AS cancellation_rate
+FROM `demo.trips.rides`
+WHERE DATE_TRUNC(ride_date, QUARTER) = DATE '2026-01-01';","House convention: a ride is 'cancelled' when it ends within 2 minutes of unlock with no distance — already flagged in the status column. 'Cancellation rate' is that count over all started rides in the quarter. Trust-critical: the agent must use the status flag, not invent its own duration threshold.",demo.trips.rides,"filter, ratio, conditional_count",N,Y,draft
+t2_net_revenue_2026,T2,business_logic,finance,What was our net ride revenue in 2026?,"SELECT
+  SUM(gross_fare) - SUM(refunds) - SUM(promo_credits) AS net_revenue
+FROM `demo.finance.ride_revenue`
+WHERE EXTRACT(YEAR FROM event_date) = 2026;",'Net ride revenue' here = gross fares - refunds - promo credits (tax handled upstream). Tests whether the agent retrieves the canonical definition vs guessing.,demo.finance.ride_revenue,"aggregate, arithmetic",N,Y,draft
+t2_rides_last_vs_previous_month,T2,temporal_logic,operations,How many rides did we have last month compared to the previous month?,"SELECT
+  DATE_TRUNC(ride_date, MONTH) AS month,
+  COUNT(*) AS rides
+FROM `demo.trips.rides`
+WHERE ride_date >= DATE_TRUNC(DATE_SUB(CURRENT_DATE(), INTERVAL 2 MONTH), MONTH)
+  AND ride_date <  DATE_TRUNC(CURRENT_DATE(), MONTH)
+GROUP BY 1
+ORDER BY 1;","'Last month' = the most recent full calendar month, not trailing 30 days. Inclusive/exclusive boundaries must be right. Off-by-one date errors are the most common silent-wrongness mode in analytics.",demo.trips.rides,"date_trunc, group_by, range_filter",N,N,draft
+t2_fare_per_member_fanout_trap,T2,silent_wrongness,finance,What is the total fare per member for the top 100 members?,"WITH per_member AS (
+  SELECT member_id, SUM(fare) AS total_fare
+  FROM `demo.trips.rides`
+  GROUP BY member_id
+)
+SELECT * FROM per_member ORDER BY total_fare DESC LIMIT 100;","Trap: a naive agent will join `rides` to `ride_events` to get fares, but that fans out and inflates the total. Correct approach: aggregate at the ride grain first. Tests whether the agent recognizes the fan-out hazard.",demo.trips.rides,"cte, group_by, sum, order_by, limit",N,N,draft
+t2_members_with_no_rides_anti_join,T2,silent_wrongness,membership,How many members have never taken a ride?,"SELECT COUNT(*) AS never_rode
+FROM `demo.dim.members` m
+LEFT JOIN `demo.trips.rides` r USING (member_id)
+WHERE r.member_id IS NULL;",Trap: a naive `LEFT JOIN ... WHERE r.something = X` would convert the LEFT JOIN to an INNER JOIN. The correct anti-join filters on the joined-side key being NULL. Same trap with NOT IN + nullable column.,"demo.dim.members, demo.trips.rides","left_join, anti_join, null_filter",N,N,draft
+t2_nps_by_city_no_data,T2,hallucination_resistance,membership,What is our rider NPS score by city?,-- Expected: agent refuses or proposes a proxy. There is no NPS data in the warehouse.,There is no NPS data ingested. A trustworthy agent says so and (optionally) proposes a proxy like repeat-ride rate or in-app rating. An untrustworthy agent invents a `members.nps_score` column. Score this case via the judge — exec_match is N/A.,,refusal_expected,N,N,draft
+t3_top_riders_ambiguous,T3,ambiguity_handling,membership,Who are our top riders?,"-- Multiple valid interpretations: top by ride count, by distance, by fare, by recency.
+-- Expected: agent surfaces its assumption explicitly. Score correct if explanation states which interpretation it used.
+SELECT member_id, COUNT(*) AS rides
+FROM `demo.trips.rides`
+WHERE ride_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 12 MONTH)
+GROUP BY member_id
+ORDER BY rides DESC
+LIMIT 10;","Ambiguous on purpose. The 'correct' answer is one where the agent picks an interpretation AND surfaces it in the explanation. exec_match might fail (agent picked distance, peak picked ride count) — that's fine if the judge sees a clean explanation.",demo.trips.rides,"group_by, order_by, limit",Y,N,draft
+t3_best_performing_station,T3,ambiguity_handling,operations,Which station is performing best?,"-- Multiple defensible interpretations: by rides started, by dock utilization, by revenue, by growth rate. Agent must surface assumption.","Same shape as t3_top_riders_ambiguous: judge based on whether the agent surfaces its choice, not whether it matches peak.",,,Y,N,draft
+t3_predict_next_quarter,T3,refusal_scope,growth,What will our ridership be next quarter?,"-- Expected: agent refuses or reframes. This is forecasting, not data retrieval.",Out of scope. The agent should refuse or reframe ('I can show you trailing trends; predicting requires modeling'). Hallucinating a forecast is a serious trust failure.,,refusal_expected,N,N,draft
+t3_rides_for_nonexistent_member,T3,refusal_scope,membership,Show me rides from member ID 999999999.,"SELECT * FROM `demo.trips.rides`
+WHERE member_id = 999999999
+LIMIT 100;",Member doesn't exist. Trustworthy: returns empty result + says so. Untrustworthy: invents rows. Empty result is the correct answer — judge based on whether the explanation acknowledges the absence.,demo.trips.rides,"filter, limit",N,N,draft
+t3_contradictory_dates,T3,adversarial_robustness,operations,Show me ridership from January but only counting rides taken in February.,-- Contradictory premise. Expected: agent flags the contradiction or interprets one of the two and explains.,The two clauses contradict. Score on whether the agent surfaces the issue rather than silently picking one.,,,Y,N,draft
+t3_one_word_question,T3,adversarial_robustness,general,Ridership?,-- Underspecified. Expected: agent asks for clarification or returns a sensible default with explicit assumption.,Tests graceful handling of underspecified prompts. Should not crash or invent a complex answer.,,,Y,N,draft

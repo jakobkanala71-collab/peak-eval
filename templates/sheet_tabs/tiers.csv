@@ -1,0 +1,4 @@
+tier,name,definition,scoring_rule,target_share_of_corpus
+T1,Floor check,Trivial / impossible to fail. Sanity check that the harness and agent both work.,Aggregated as 'Headline correctness' — threshold 90%.,20%
+T2,Main signal,Unambiguous but hard. Real analytical questions with exactly one correct interpretation. Where you actually compare agents.,Trust-critical aggregate (when category is trust-critical). Threshold 85%.,65%
+T3,Judgment calls,Ambiguous by design — multiple valid interpretations. Tests whether the agent recognizes ambiguity.,"Calibration aggregate (ambiguity_handling, refusal_scope). Threshold 80%. Judged on explanation, not exec_match.",15%

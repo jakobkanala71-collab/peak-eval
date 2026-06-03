@@ -1,0 +1,13 @@
+slug,title,trust_risk,trust_critical,calibration,description,example
+translation_correctness,Translation correctness,low,N,N,"Baseline competency: aggregates, joins, window functions, CTEs. Floor check that the agent can produce executable SQL for clearly-specified questions.",How many members do we have?
+schema_selection,Schema selection,high,Y,N,"Picks the right table when several look plausible (rides vs rides_v2, members vs members_archive). Failures = confident-looking wrong numbers.","Active members — when there's members, members_v2, members_archive."
+business_logic,Business logic & domain knowledge,high,Y,N,"Knows domain conventions without being told (net revenue, cancelled ride, active member). Failures = wrong number with the right shape.",Cancellation rate in Q1 — house counts a ride cancelled if it ends < 2 min with no distance.
+temporal_logic,Temporal & calendar logic,high,Y,N,"Date math, time zones, fiscal calendars, period comparisons. Off-by-one errors are the #1 silent-wrongness mode.",Rides last month vs the previous month.
+silent_wrongness,Silent-wrongness traps,high,Y,N,"Cases designed to produce wrong-but-plausible answers under naive SQL: fan-out joins, NULL semantics, mixed grain, type coercion.",Total fare per member — fan-out trap if joined through ride_events.
+ambiguity_handling,Ambiguity handling,high,N,Y,Question has multiple valid interpretations. Tests whether the agent surfaces its assumption or silently picks one.,Top riders — by what metric?
+hallucination_resistance,Hallucination resistance,high,Y,N,Asks for data the warehouse doesn't have. Tests whether the agent refuses or fabricates a column.,Rider NPS by city — there is no NPS data.
+refusal_scope,Refusal & scope awareness,medium,N,Y,"Out-of-scope questions (forecasting, real-time data, false premises). Tests whether the agent recognizes the gap.",What will ridership be next quarter? — out of scope.
+efficiency,Efficiency / cost,medium,N,N,Cheap vs expensive correct SQL. Measured on bytes scanned ratio across all correct cases.,(measured on all correct cases — no dedicated questions)
+reasoning_faithfulness,Reasoning faithfulness,high,Y,N,Does the explanation accurately describe what the SQL did? Caught by the LLM judge across all cases.,(measured on all judged cases — no dedicated questions)
+consistency_rephrasing,Consistency under rephrasing,medium,N,N,"Same question, different phrasings — does the agent give the same answer? Measured by including phrasing-variant cases.",Multiple phrasings of the same question (overlay).
+adversarial_robustness,Adversarial / robustness,low,N,N,"Malformed, contradictory, or partial questions. Tests whether the agent fails gracefully.",Show me ridership from January but only February rides.

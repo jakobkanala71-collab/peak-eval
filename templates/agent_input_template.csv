@@ -1,0 +1,2 @@
+id,agent_sql,agent_explanation
+t1_total_members,SELECT COUNT(*) FROM `demo.dim.members`;,Counted all rows in the members table to get the total member count.

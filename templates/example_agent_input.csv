@@ -1,0 +1,5 @@
+id,agent_sql,agent_explanation
+t1_total_members,SELECT COUNT(*) AS total_members FROM `demo.dim.members`;,Counted all rows in the members dimension table to produce the total member count.
+t1_avg_ride_duration_2026,"SELECT AVG(duration_min) AS avg_duration_min
+FROM `demo.trips.rides`
+WHERE ride_date BETWEEN DATE '2026-01-01' AND DATE '2026-12-31';","Filtered rides to calendar 2026 using a BETWEEN range, then averaged duration_min."

@@ -1,0 +1,8 @@
+section,content
+Purpose,This Sheet is the source of truth for peak_v2 golden cases. Edit the 'golden_cases' tab; download as CSV; drop into peak_v2/corpus/golden_cases.csv.
+How to author a case,1. Pick a tier (T1/T2/T3) and a category (one of 12). 2. Write the natural-language prompt. 3. Write the canonical (golden) SQL. 4. Write golden_reasoning explaining what makes it correct. 5. Mark ambiguity_flag (Y if the question has multiple valid readings). 6. Set status='draft' until reviewed; flip to 'approved' when ready to score against.
+Tiers,T1 = trivial (floor check). T2 = unambiguous but hard (main signal). T3 = ambiguous (judgment calls). See the 'tiers' tab for definitions and scoring rules.
+Categories,12 categories grouped by trust risk. Trust-critical categories are weighted heavily in the scorecard. See the 'categories' tab for descriptions and examples.
+Status workflow,draft → approved. Only 'approved' rows are loaded by run_benchmark.py (use --include-drafts to override). Treat 'approved' as a sign-off: this is what we score the agent against.
+Authoring tips,"Write prompts as a real analyst would type them — not as SQL pseudo-text. Each case should have ONE canonical answer (or be flagged ambiguity_flag=Y for T3). Use the query registry as a candidate pool, but rewrite descriptions into natural prompts."
+Where peak_v2 reads from,peak_v2/corpus/golden_cases.csv. The CSV is the runtime source. The Sheet is the editing surface. Commit the CSV to git so benchmark runs can reference a corpus version.
