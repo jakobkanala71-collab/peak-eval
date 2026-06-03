@@ -121,12 +121,6 @@ state that produced it.
 
 - **Parallel case execution.** Cases run serially today; a `ThreadPoolExecutor` around the
   per-case loop (capped to respect the Anthropic-calls guardrail) cuts wall-clock a lot.
-- **Local/offline backend (DuckDB) + warehouse abstraction.** Put a backend interface
-  behind `bigquery_runner` so the harness can run against DuckDB locally (zero cloud setup,
-  instant demo) and Snowflake/Postgres later.
-- **Peak-SQL result caching.** Golden SQL doesn't change between runs; cache result frames
-  keyed by `(case_id, peak_sql_hash)` and skip re-execution. Invalidate by deleting the
-  cache dir.
 
 ---
 
